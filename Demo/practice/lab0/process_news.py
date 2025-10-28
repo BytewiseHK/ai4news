@@ -1,195 +1,167 @@
 #!/usr/bin/env python3
 """
-News Processing Script for Lab 1
-Extracts titles, dates, and keywords from news articles and saves to CSV
+Lab 0: News Text Processing and Keyword Extraction
+Processes news articles and extracts titles, dates, and keywords.
 """
 
 import os
 import csv
-import re
-from collections import Counter
 from pathlib import Path
+from collections import Counter
+import re
+
+
+def read_article(filepath):
+    """
+    Read a news article file and extract title, date, and content.
+    
+    Args:
+        filepath: Path to the news article file
+        
+    Returns:
+        dict with 'title', 'date', and 'content' keys
+    """
+    with open(filepath, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    article = {
+        'title': '',
+        'date': '',
+        'content': ''
+    }
+    
+    for i, line in enumerate(lines):
+        if line.startswith('Title:'):
+            article['title'] = line.replace('Title:', '').strip()
+        elif line.startswith('Published:'):
+            article['date'] = line.replace('Published:', '').strip()
+        elif line.startswith('Content:'):
+            # Everything after "Content:" is the article content
+            article['content'] = ''.join(lines[i:]).replace('Content:', '').strip()
+            break
+    
+    return article
+
 
 def extract_keywords(text, num_keywords=3):
     """
-    Extract keywords from text using simple frequency analysis
+    Extract the most common keywords from text.
+    
     Args:
-        text (str): Input text to analyze
-        num_keywords (int): Number of top keywords to return
+        text: The text to analyze
+        num_keywords: Number of keywords to extract (default: 3)
+        
     Returns:
-        list: Top keywords
+        list of top keywords
     """
     # Convert to lowercase and remove punctuation
-    text = re.sub(r'[^\w\s]', ' ', text.lower())
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', ' ', text)
     
-    # Common stop words to exclude
+    # Split into words
+    words = text.split()
+    
+    # Common stop words to filter out
     stop_words = {
-        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-        'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does',
-        'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that',
-        'these', 'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
-        'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself',
-        'she', 'her', 'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',
-        'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'whose', 'this', 'that',
-        'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
-        'having', 'do', 'does', 'did', 'doing', 'will', 'would', 'should', 'could',
-        'ought', 'i\'m', 'you\'re', 'he\'s', 'she\'s', 'it\'s', 'we\'re', 'they\'re',
-        'i\'ve', 'you\'ve', 'we\'ve', 'they\'ve', 'i\'d', 'you\'d', 'he\'d', 'she\'d',
-        'we\'d', 'they\'d', 'i\'ll', 'you\'ll', 'he\'ll', 'she\'ll', 'we\'ll',
-        'they\'ll', 'isn\'t', 'aren\'t', 'wasn\'t', 'weren\'t', 'haven\'t', 'hasn\'t',
-        'hadn\'t', 'won\'t', 'wouldn\'t', 'don\'t', 'doesn\'t', 'didn\'t', 'can\'t',
-        'couldn\'t', 'shouldn\'t', 'mustn\'t', 'needn\'t', 'daren\'t', 'mayn\'t',
-        'oughtn\'t', 'from', 'up', 'about', 'into', 'over', 'after'
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
+        'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+        'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these',
+        'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'them', 'their',
+        'what', 'which', 'who', 'when', 'where', 'why', 'how', 'all', 'each',
+        'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
+        'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very'
     }
     
-    # Split into words and filter
-    words = text.split()
-    filtered_words = [word for word in words 
-                     if len(word) > 3 and word not in stop_words]
+    # Filter out stop words and short words
+    filtered_words = [
+        word for word in words 
+        if word not in stop_words and len(word) > 3
+    ]
     
-    # Count frequency and return top keywords
-    word_freq = Counter(filtered_words)
-    top_keywords = [word for word, count in word_freq.most_common(num_keywords)]
+    # Count word frequencies
+    word_counts = Counter(filtered_words)
     
-    # Ensure we have exactly num_keywords items (pad with empty strings if needed)
-    while len(top_keywords) < num_keywords:
-        top_keywords.append('')
+    # Get top keywords
+    top_keywords = [word for word, count in word_counts.most_common(num_keywords)]
     
-    return top_keywords[:num_keywords]
+    return top_keywords
 
-def parse_article(file_path):
+
+def process_news_articles(articles_dir, output_csv):
     """
-    Parse a news article file and extract title, date, and content
+    Process all news articles in a directory and save to CSV.
+    
     Args:
-        file_path (str): Path to the article file
-    Returns:
-        dict: Dictionary containing parsed article data
+        articles_dir: Directory containing news article files
+        output_csv: Path to output CSV file
     """
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
-        
-        lines = content.split('\n')
-        
-        # Extract title (first line after "Title:")
-        title = ""
-        published_date = ""
-        article_content = ""
-        
-        for i, line in enumerate(lines):
-            if line.startswith('Title:'):
-                title = line.replace('Title:', '').strip()
-            elif line.startswith('Published:'):
-                published_date = line.replace('Published:', '').strip()
-            elif line.startswith('Content:'):
-                # Join all remaining lines as content
-                article_content = '\n'.join(lines[i+1:]).strip()
-                break
-        
-        return {
-            'filename': os.path.basename(file_path),
-            'title': title,
-            'publish_date': published_date,
-            'content': article_content
-        }
+    # Find all .txt files in the articles directory
+    articles_path = Path(articles_dir)
+    txt_files = sorted(articles_path.glob('*.txt'))
     
-    except Exception as e:
-        print(f"Error parsing {file_path}: {e}")
-        return None
-
-def find_news_files(directory):
-    """
-    Find all .txt files in the specified directory
-    Args:
-        directory (str): Directory path to search
-    Returns:
-        list: List of file paths
-    """
-    news_files = []
-    try:
-        for file_name in os.listdir(directory):
-            if file_name.endswith('.txt'):
-                file_path = os.path.join(directory, file_name)
-                news_files.append(file_path)
-    except FileNotFoundError:
-        print(f"Directory not found: {directory}")
-    
-    return sorted(news_files)
-
-def process_news_articles():
-    """
-    Main function to process all news articles and generate CSV output
-    """
-    # Define paths
-    current_dir = Path(__file__).parent
-    articles_dir = current_dir.parent / 'sample_news_articles'
-    output_file = current_dir / 'news_data.csv'
-    
-    print(f"Looking for news articles in: {articles_dir}")
-    print(f"Output will be saved to: {output_file}")
-    
-    # Find all news files
-    news_files = find_news_files(str(articles_dir))
-    
-    if not news_files:
-        print("No .txt files found in the articles directory!")
+    if not txt_files:
+        print(f"No .txt files found in {articles_dir}")
         return
     
-    print(f"Found {len(news_files)} news articles:")
-    for file_path in news_files:
-        print(f"  - {os.path.basename(file_path)}")
+    print(f"Found {len(txt_files)} news articles to process")
     
     # Process each article
-    processed_articles = []
-    
-    for file_path in news_files:
-        print(f"\nProcessing: {os.path.basename(file_path)}")
+    results = []
+    for txt_file in txt_files:
+        print(f"Processing: {txt_file.name}")
         
-        article_data = parse_article(file_path)
-        if article_data:
-            # Extract keywords
-            keywords = extract_keywords(article_data['content'], 3)
-            
-            # Add keywords to article data
-            article_data['keyword1'] = keywords[0] if len(keywords) > 0 else ''
-            article_data['keyword2'] = keywords[1] if len(keywords) > 1 else ''
-            article_data['keyword3'] = keywords[2] if len(keywords) > 2 else ''
-            
-            processed_articles.append(article_data)
-            
-            print(f"  Title: {article_data['title']}")
-            print(f"  Date: {article_data['publish_date']}")
-            print(f"  Keywords: {keywords}")
-    
-    # Save to CSV
-    if processed_articles:
-        fieldnames = ['filename', 'title', 'publish_date', 'keyword1', 'keyword2', 'keyword3']
+        # Read article
+        article = read_article(txt_file)
         
-        try:
-            with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                
-                for article in processed_articles:
-                    # Only write the fields we want in the CSV
-                    csv_row = {field: article.get(field, '') for field in fieldnames}
-                    writer.writerow(csv_row)
-            
-            print(f"\n✅ Successfully processed {len(processed_articles)} articles!")
-            print(f"📄 Results saved to: {output_file}")
-            
-            # Display CSV content
-            print("\n📊 Generated CSV content:")
-            print("-" * 80)
-            with open(output_file, 'r', encoding='utf-8') as f:
-                print(f.read())
-                
-        except Exception as e:
-            print(f"❌ Error saving CSV file: {e}")
-    else:
-        print("❌ No articles were successfully processed!")
+        # Extract keywords from content
+        keywords = extract_keywords(article['content'], num_keywords=3)
+        
+        # Store result
+        results.append({
+            'filename': txt_file.name,
+            'title': article['title'],
+            'date': article['date'],
+            'keyword1': keywords[0] if len(keywords) > 0 else '',
+            'keyword2': keywords[1] if len(keywords) > 1 else '',
+            'keyword3': keywords[2] if len(keywords) > 2 else ''
+        })
+    
+    # Write to CSV
+    with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['filename', 'title', 'date', 'keyword1', 'keyword2', 'keyword3']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for result in results:
+            writer.writerow(result)
+    
+    print(f"\nResults saved to: {output_csv}")
+    print(f"Processed {len(results)} articles successfully!")
 
-if __name__ == "__main__":
-    print("🔍 News Article Processing Script")
-    print("=" * 50)
-    process_news_articles()
+
+def main():
+    """Main function to run the news processing script."""
+    # Define paths
+    articles_dir = '../sample_news_articles'
+    output_csv = 'news_data.csv'
+    
+    # Process articles
+    process_news_articles(articles_dir, output_csv)
+    
+    # Display results
+    print("\n" + "="*60)
+    print("Preview of extracted data:")
+    print("="*60)
+    
+    with open(output_csv, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            print(f"\nFile: {row['filename']}")
+            print(f"Title: {row['title'][:60]}...")
+            print(f"Date: {row['date']}")
+            print(f"Keywords: {row['keyword1']}, {row['keyword2']}, {row['keyword3']}")
+
+
+if __name__ == '__main__':
+    main()
